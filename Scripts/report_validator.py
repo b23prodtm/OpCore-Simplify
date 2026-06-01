@@ -23,7 +23,7 @@ class ReportValidator:
             "pci_path": r"^PciRoot\(0x[0-9a-fA-F]+\)(?:/Pci\(0x[0-9a-fA-F]+,0x[0-9a-fA-F]+\))+$",
             "acpi_path": r"^[\\]?(_SB|_TZ_|_GPE|[A-Z][A-Z0-9]{0,3})(\.[A-Z0-9_]+)*$",
             "core_count": r"^\d+$",
-            "connector_type": r"^(VGA|DVI|HDMI(-A)?|LVDS|DP|eDP|Internal|Uninitialized)$",
+            "connector_type": r"^(VGA|DVI(-[IAD])?|HDMI(-A)?|LVDS|DP|eDP|Internal|Uninitialized)$",
             "enabled_disabled": r"^(Enabled|Disabled)$"
         }
         
@@ -47,7 +47,8 @@ class ReportValidator:
                         "Release Date": {"type": str, "required": False},
                         "System Type": {"type": str, "required": False},
                         "Firmware Type": {"type": str, "pattern": self.PATTERNS["firmware_type"]},
-                        "Secure Boot": {"type": str, "pattern": self.PATTERNS["enabled_disabled"]}
+                        "Secure Boot": {"type": str, "pattern": self.PATTERNS["enabled_disabled"]},
+                        "Above 4G Decoding": {"type": str, "required": False, "pattern": self.PATTERNS["enabled_disabled"]}
                     }
                 },
                 "CPU": {
@@ -72,6 +73,7 @@ class ReportValidator:
                             "Codename": {"type": str},
                             "Device ID": {"type": str, "pattern": self.PATTERNS["device_id"]},
                             "Device Type": {"type": str, "pattern": self.PATTERNS["gpu_device_type"]},
+                            "Bus Type": {"type": str, "required": False},
                             "Subsystem ID": {"type": str, "required": False, "pattern": self.PATTERNS["hex_id"]},
                             "PCI Path": {"type": str, "required": False, "pattern": self.PATTERNS["pci_path"]},
                             "ACPI Path": {"type": str, "required": False, "pattern": self.PATTERNS["acpi_path"]},
@@ -115,7 +117,9 @@ class ReportValidator:
                             "Device ID": {"type": str, "pattern": self.PATTERNS["device_id"]},
                             "Subsystem ID": {"type": str, "required": False, "pattern": self.PATTERNS["hex_id"]},
                             "Audio Endpoints": {"type": list, "required": False, "item_rule": {"type": str}},
-                            "Controller Device ID": {"type": str, "required": False, "pattern": self.PATTERNS["device_id"]}
+                            "Controller Device ID": {"type": str, "required": False, "pattern": self.PATTERNS["device_id"]},
+                            "PCI Path": {"type": str, "required": False, "pattern": self.PATTERNS["pci_path"]},
+                            "ACPI Path": {"type": str, "required": False, "pattern": self.PATTERNS["acpi_path"]}
                         }
                     }
                 },
@@ -148,7 +152,7 @@ class ReportValidator:
                 },
                 "Storage Controllers": {
                     "type": dict,
-                    "required": True,
+                    "required": False,
                     "values_rule": {
                         "type": dict,
                         "schema": {
