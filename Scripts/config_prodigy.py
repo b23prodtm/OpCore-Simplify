@@ -377,7 +377,7 @@ class ConfigProdigy:
                     "IOName": "1D6A-91B1"
                 })
             elif device_id in pci_data.IntelWiFiIDs:
-                if all((kexts[kext_data.kext_index_by_name.get("AirportItlwm")].checked, self.utils.parse_darwin_version(macos_version) >= self.utils.parse_darwin_version("23.0.0"))):
+                if all((kexts[kext_data.kext_index_by_name.get("AirportItlwm")].checked, self.utils.parse_darwin_version(macos_version) >= self.utils.parse_darwin_version("24.0.0"))):
                     if all((kexts[kext_data.kext_index_by_name.get("IOSkywalkFamily")].checked, kexts[kext_data.kext_index_by_name.get("IO80211FamilyLegacy")].checked)):
                         add_device_property(network_props.get("PCI Path"), {"IOName": "pci14e4,43a0"})
 
@@ -605,6 +605,7 @@ class ConfigProdigy:
                 "Arguments": "",
                 "Comment": "",
                 "Enabled": True,
+                "HideVerbose": "apfs_aligned.efi" in required_drivers,
                 "LoadEarly": False,
                 "Path": driver
             })
@@ -618,7 +619,7 @@ class ConfigProdigy:
         del config["#WARNING - 4"]
 
         config["Booter"]["MmioWhitelist"] = self.mmio_whitelist(hardware_report.get("Motherboard").get("Chipset"))
-        config["Booter"]["Patch"] = self.add_booter_patch(smbios_model, macos_version)
+        config["Booter"]["Patch"] = self.add_booter_patch(smbios_model, macos_version) or config["Booter"]["Patch"]
         config["Booter"]["Quirks"]["AvoidRuntimeDefrag"] = not (hardware_report.get("BIOS").get("Firmware Type") == "Legacy" and self.utils.parse_darwin_version(macos_version) != self.utils.parse_darwin_version("20.0.0"))
         config["Booter"]["Quirks"]["DevirtualiseMmio"] = len(config["Booter"]["MmioWhitelist"]) != 0 or \
             hardware_report.get("Motherboard").get("Chipset") in chipset_data.IntelChipsets[112:] + chipset_data.IntelChipsets[90:100] or \
@@ -674,8 +675,7 @@ class ConfigProdigy:
         )
 
         config["Misc"]["BlessOverride"] = []
-        config["Misc"]["Boot"]["HideAuxiliary"] = False
-        config["Misc"]["Boot"]["PickerMode"] = "Builtin" if hardware_report.get("BIOS").get("Firmware Type") != "UEFI" else "External"
+        config["Misc"]["Boot"]["PickerMode"] = "Builtin"
         config["Misc"]["Debug"]["AppleDebug"] = config["Misc"]["Debug"]["ApplePanic"] = False
         config["Misc"]["Debug"]["DisableWatchDog"] = True
         config["Misc"]["Entries"] = []
@@ -688,6 +688,7 @@ class ConfigProdigy:
         del config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["#INFO (prev-lang:kbd)"]
         config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["boot-args"] = self.boot_args(hardware_report, macos_version, needs_oclp, kexts, config)
         config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["csr-active-config"] = self.utils.hex_to_bytes(self.csr_active_config(macos_version))
+        config["NVRAM"]["Delete"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"].append("csr-active-config")
         config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["prev-lang:kbd"] = self.utils.hex_to_bytes("")
 
         config["PlatformInfo"]["Generic"].update(self.smbios.generate_smbios(smbios_model))
@@ -709,6 +710,7 @@ class ConfigProdigy:
         if kexts[kext_data.kext_index_by_name.get("BlueToolFixup")].checked:
             config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["bluetoothExternalDongleFailed"] = self.utils.hex_to_bytes("00")
             config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]["bluetoothInternalControllerInfo"] = self.utils.hex_to_bytes("0000000000000000000000000000")
+            config["NVRAM"]["Delete"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"].extend(["bluetoothExternalDongleFailed", "bluetoothInternalControllerInfo"])
 
         if kexts[kext_data.kext_index_by_name.get("RestrictEvents")].checked:
             revpatch = []
@@ -741,9 +743,6 @@ class ConfigProdigy:
                 config["NVRAM"]["Add"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"]["revblock"] = ",".join(revblock)
         
         config["NVRAM"]["Delete"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"] = list(config["NVRAM"]["Add"]["4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102"].keys())
-        config["NVRAM"]["Delete"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"] = list(config["NVRAM"]["Add"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"].keys())
-        if "run-efi-updater" in config["NVRAM"]["Delete"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"]:
-            config["NVRAM"]["Delete"]["7C436110-AB2A-4BBB-A880-FE41995C9F82"].remove("run-efi-updater")
 
         # ── VM / Hypervisor overrides ─────────────────────────────────────────────
         # Détection : Motherboard name ou BIOS vendor contenant Xen/QEMU/VMware/KVM

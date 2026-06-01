@@ -104,7 +104,7 @@ class Github:
                 if download_link is None and "<a" in line and "href=\"" in line and "/releases/download" in line:
                     download_link = line.split("href=\"", 1)[1].split("\"", 1)[0]
 
-                    if not ("tlwm" in download_link or ("tlwm" not in download_link and "DEBUG" not in download_link.upper())):
+                    if not ("tlwm" in download_link or ("tlwm" not in download_link and "RESEARCH" not in download_link.upper() and "DEBUG" not in download_link.upper())):
                         in_li_block = False
                         continue
 
@@ -151,13 +151,13 @@ class Github:
                 asset_name += "22"
             elif "Monterey" in file_name:
                 asset_name += "21"
-            elif "BigSur" in file_name:
+            elif "Big_Sur" in file_name:
                 asset_name += "20"
             elif "Catalina" in file_name:
                 asset_name += "19"
             elif "Mojave" in file_name:
                 asset_name += "18"
-            elif "HighSierra" in file_name:
+            elif "High_Sierra" in file_name:
                 asset_name += "17"
 
         return asset_name
