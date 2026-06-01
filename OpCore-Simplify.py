@@ -338,16 +338,23 @@ class OCPE:
         return requirements
 
     def before_using_efi(self, org_hardware_report, hardware_report):
-        self.u.head("Before Using EFI")
-        print("")                 
-        print("\033[93mPlease complete the following steps:\033[0m")
-        print("")
-        
-        bios_requirements = self.check_bios_requirements(org_hardware_report, hardware_report)
-        if bios_requirements:
-            print("* BIOS/UEFI Settings Required:")
-            for requirement in bios_requirements:
-                print("    - {}".format(requirement))
+        while True:
+            self.u.head("Before Using EFI")
+            print("")                 
+            print("\033[93mPlease complete the following steps:\033[0m")
+            print("")
+            
+            bios_requirements = self.check_bios_requirements(org_hardware_report, hardware_report)
+            if bios_requirements:
+                print("* BIOS/UEFI Settings Required:")
+                for requirement in bios_requirements:
+                    print("    - {}".format(requirement))
+                print("")
+            
+            print("* USB Mapping:")
+            print("    - USBInjectAll.kext is included and will inject all USB ports automatically.")
+            print("    - If you experience issues, use USBToolBox to create a custom USB map.")
+            print("    - Replace USBInjectAll.kext with your custom UTBMap.kext in the {} folder.".format("EFI\\OC\\Kexts" if os.name == "nt" else "EFI/OC/Kexts"))
             print("")
         
         print("* USB Mapping:")
@@ -461,7 +468,9 @@ class OCPE:
                 self.u.request_input("Press Enter to main menu...")
 
 if __name__ == '__main__':
-    update_flag = updater.Updater().run_update()
+    CHECK_FOR_UPDATES = os.environ.get("OCS_CHECK_UPDATES", "0") == "1"
+
+    update_flag = updater.Updater().run_update() if CHECK_FOR_UPDATES else False
     if update_flag:
         os.execv(sys.executable, ['python3'] + sys.argv)
 
