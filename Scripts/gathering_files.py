@@ -19,38 +19,47 @@ class gatheringFiles:
         self.integrity_checker = integrity_checker.IntegrityChecker()
         self.dortania_builds_url = "https://raw.githubusercontent.com/dortania/build-repo/builds/latest.json"
         self.ocbinarydata_url = "https://github.com/acidanthera/OcBinaryData/archive/refs/heads/master.zip"
-        self.amd_vanilla_patches_url = "https://raw.githubusercontent.com/AMD-OSX/AMD_Vanilla/beta/patches.plist"
+        self.amd_vanilla_patches_url = "https://raw.githubusercontent.com/laobamac/AMD_Vanilla/refs/heads/master/patches.plist"
         self.aquantia_macos_patches_url = "https://raw.githubusercontent.com/CaseySJ/Aquantia-macOS-Patches/refs/heads/main/CaseySJ-Aquantia-Patch-Sets-1-and-2.plist"
         self.hyper_threading_patches_url = "https://github.com/b00t0x/CpuTopologyRebuild/raw/refs/heads/master/patches_ht.plist"
         self.temporary_dir = self.utils.get_temporary_dir()
         self.ock_files_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "OCK_Files")
         self.download_history_file = os.path.join(self.ock_files_dir, "history.json")
 
-    def get_product_index(self, product_list, product_name_name):
-        for index, product in enumerate(product_list):
-            if product_name_name == product.get("product_name"):
-                return index
-        return None
+    def _load_download_history(self):
+        history_data = self.utils.read_file(self.download_history_file)
+        return {item["product_name"]: item for item in history_data if item.get("product_name")} if isinstance(history_data, list) else {}
+    
+    def _save_download_history(self, local_download_history, product_name, product_id, product_url, sha256_hash):
+        local_download_history[product_name] = {
+            "product_name": product_name, 
+            "id": product_id,
+            "url": product_url,
+            "sha256": sha256_hash
+        }
         
-    def update_download_database(self, kexts, download_history):
-        download_database = download_history.copy()
+        self.utils.create_folder(os.path.dirname(self.download_history_file))
+        sorted_history = sorted(local_download_history.values(), key=lambda x: x.get("product_name", ""))
+        self.utils.write_file(self.download_history_file, sorted_history)
+
+    def fetch_latest_products_info(self, kexts, local_download_history):
+        latest_products = {k: v.copy() for k, v in local_download_history.items()}
         dortania_builds_data = self.fetcher.fetch_and_parse_content(self.dortania_builds_url, "json")
         seen_repos = set()
 
-        def add_product_to_download_database(products):
+        def add_product_info(products):
             if isinstance(products, dict):
                 products = [products]
 
             for product in products:
-                if not product or not product.get("product_name"):
+                name = product.get("product_name")
+                if not product or not name:
                     continue
 
-                product_index = self.get_product_index(download_database, product.get("product_name"))
-
-                if product_index is None:
-                    download_database.append(product)
+                if name not in latest_products:
+                    latest_products[name] = product
                 else:
-                    download_database[product_index].update(product)
+                    latest_products[name].update(product)
 
         for kext in kexts:
             if not kext.checked:
@@ -59,12 +68,12 @@ class gatheringFiles:
             if kext.download_info:
                 if not kext.download_info.get("sha256"):
                     kext.download_info["sha256"] = None
-                add_product_to_download_database({"product_name": kext.name, **kext.download_info})
+                add_product_info({"product_name": kext.name, **kext.download_info})
             elif kext.github_repo and kext.github_repo.get("repo") not in seen_repos:
                 name = kext.github_repo.get("repo")
                 seen_repos.add(name)
-                if name != "IntelBluetoothFirmware" and name in dortania_builds_data:
-                    add_product_to_download_database({
+                if name in dortania_builds_data:
+                    add_product_info({
                         "product_name": name,
                         "id": dortania_builds_data[name]["versions"][0]["release"]["id"], 
                         "url": dortania_builds_data[name]["versions"][0]["links"]["release"],
@@ -72,16 +81,16 @@ class gatheringFiles:
                     })
                 else:
                     latest_release = self.github.get_latest_release(kext.github_repo.get("owner"), kext.github_repo.get("repo")) or {}
-                    add_product_to_download_database(latest_release.get("assets"))
+                    add_product_info(latest_release.get("assets"))
 
-        add_product_to_download_database({
+        add_product_info({
             "product_name": "OpenCorePkg",
             "id": dortania_builds_data["OpenCorePkg"]["versions"][0]["release"]["id"], 
             "url": dortania_builds_data["OpenCorePkg"]["versions"][0]["links"]["release"],
             "sha256": dortania_builds_data["OpenCorePkg"]["versions"][0]["hashes"]["release"]["sha256"]
         })
 
-        return sorted(download_database, key=lambda x:x["product_name"])
+        return latest_products
     
     def move_bootloader_kexts_to_product_directory(self, product_name):
         if not os.path.exists(self.temporary_dir):
@@ -95,7 +104,7 @@ class gatheringFiles:
                 source_kext_path = os.path.join(self.temporary_dir, product_name, kext_path)
                 destination_kext_path = os.path.join(self.ock_files_dir, product_name, os.path.basename(kext_path))
                 
-                if "debug" in kext_path.lower() or "Contents" in kext_path or not self.kext.process_kext(temp_product_dir, kext_path):
+                if "research" in kext_path.lower() or "debug" in kext_path.lower() or "Contents" in kext_path or not self.kext.process_kext(temp_product_dir, kext_path):
                     continue
                 
                 shutil.move(source_kext_path, destination_kext_path)
@@ -142,12 +151,9 @@ class gatheringFiles:
         self.utils.head("Gathering Files")
         print("")
         print("Please wait for download OpenCorePkg, kexts and macserial...")
+        local_download_history = self._load_download_history()
 
-        download_history = self.utils.read_file(self.download_history_file)
-        if not isinstance(download_history, list):
-            download_history = []
-
-        download_database = self.update_download_database(kexts, download_history)
+        latest_products = self.fetch_latest_products_info(kexts, local_download_history)
         
         self.utils.create_folder(self.temporary_dir)
 
@@ -161,7 +167,7 @@ class gatheringFiles:
             
             if product_name == "AirportItlwm":
                 version = macos_version[:2]
-                if all((kexts[kext_maestro.kext_data.kext_index_by_name.get("IOSkywalkFamily")].checked, kexts[kext_maestro.kext_data.kext_index_by_name.get("IO80211FamilyLegacy")].checked)) or self.utils.parse_darwin_version("24.0.0") <= self.utils.parse_darwin_version(macos_version):
+                if all((self.utils.parse_darwin_version("24.0.0") <= self.utils.parse_darwin_version(macos_version), kexts[kext_maestro.kext_data.kext_index_by_name.get("IOSkywalkFamily")].checked, kexts[kext_maestro.kext_data.kext_index_by_name.get("IO80211FamilyLegacy")].checked)):
                     version = "22"
                 elif self.utils.parse_darwin_version("23.4.0") <= self.utils.parse_darwin_version(macos_version):
                     version = "23.4"
@@ -181,17 +187,16 @@ class gatheringFiles:
             elif product_name == "UTBDefault":
                 product_name = "USBToolBox"
 
-            product_download_index = self.get_product_index(download_database, product_name)
-            if product_download_index is None:
+            product_info = latest_products.get(product_name)
+            if product_info is None:
                 if hasattr(product, 'github_repo') and product.github_repo:
-                    product_download_index = self.get_product_index(download_database, product.github_repo.get("repo"))
+                    product_info = latest_products.get(product.github_repo.get("repo"))
             
-            if product_download_index is None:
+            if product_info is None:
                 print("\n")
                 print("Could not find download URL for {}.".format(product_name))
                 continue
 
-            product_info = download_database[product_download_index]
             product_id = product_info.get("id")
             product_download_url = product_info.get("url")
             sha256_hash = product_info.get("sha256")
@@ -200,12 +205,11 @@ class gatheringFiles:
                 continue
             seen_download_urls.add(product_download_url)
 
-            product_history_index = self.get_product_index(download_history, product_name)
+            history_item = local_download_history.get(product_name)
             asset_dir = os.path.join(self.ock_files_dir, product_name)
             manifest_path = os.path.join(asset_dir, "manifest.json")
 
-            if product_history_index is not None:
-                history_item = download_history[product_history_index]
+            if history_item is not None:
                 is_latest_id = (product_id == history_item.get("id"))
                 folder_is_valid, _ = self.integrity_checker.verify_folder_integrity(asset_dir, manifest_path)
                 
@@ -214,7 +218,7 @@ class gatheringFiles:
                     continue
 
             print("")
-            print("Updating" if product_history_index is not None else "Please wait for download", end=" ")
+            print("Updating" if history_item is not None else "Please wait for download", end=" ")
             print("{}...".format(product_name))
             if product_download_url:
                 print("from {}".format(product_download_url))
@@ -230,7 +234,7 @@ class gatheringFiles:
             zip_path = os.path.join(self.temporary_dir, product_name) + ".zip"
             if not self.fetcher.download_and_save_file(product_download_url, zip_path, sha256_hash):
                 folder_is_valid, _ = self.integrity_checker.verify_folder_integrity(asset_dir, manifest_path)
-                if product_history_index is not None and folder_is_valid:
+                if history_item is not None and folder_is_valid:
                     print("Using previously downloaded version of {}.".format(product_name))
                     continue
                 else:
@@ -239,14 +243,20 @@ class gatheringFiles:
             self.utils.extract_zip_file(zip_path)
             self.utils.create_folder(asset_dir, remove_content=True)
             
-            while True:
-                nested_zip_files = self.utils.find_matching_paths(os.path.join(self.temporary_dir, product_name), extension_filter=".zip")
-                if not nested_zip_files:
-                    break
-                for zip_file, _ in nested_zip_files:
-                    full_zip_path = os.path.join(self.temporary_dir, product_name, zip_file)
-                    self.utils.extract_zip_file(full_zip_path)
-                    os.remove(full_zip_path)
+            dirs_to_scan = [os.path.join(self.temporary_dir, product_name)]
+            while dirs_to_scan:
+                current_dir = dirs_to_scan.pop()
+                if not os.path.isdir(current_dir):
+                    continue
+                
+                for item in os.listdir(current_dir):
+                    item_path = os.path.join(current_dir, item)
+                    if os.path.isdir(item_path):
+                        dirs_to_scan.append(item_path)
+                    elif item.lower().endswith(".zip"):
+                        self.utils.extract_zip_file(item_path)
+                        os.remove(item_path)
+                        dirs_to_scan.append(os.path.splitext(item_path)[0])
 
             if "OpenCore" in product_name:
                 oc_binary_data_zip_path = os.path.join(self.temporary_dir, "OcBinaryData.zip")
@@ -268,7 +278,7 @@ class gatheringFiles:
 
             if self.move_bootloader_kexts_to_product_directory(product_name):
                 self.integrity_checker.generate_folder_manifest(asset_dir, manifest_path)
-                self._update_download_history(download_history, product_name, product_id, product_download_url, sha256_hash)
+                self._save_download_history(local_download_history, product_name, product_id, product_download_url, sha256_hash)
 
         shutil.rmtree(self.temporary_dir, ignore_errors=True)
         return True
@@ -287,24 +297,6 @@ class gatheringFiles:
             print("")
             self.utils.request_input()
             return []
-        
-    def _update_download_history(self, download_history, product_name, product_id, product_url, sha256_hash):
-        product_history_index = self.get_product_index(download_history, product_name)
-        
-        entry = {
-            "product_name": product_name, 
-            "id": product_id,
-            "url": product_url,
-            "sha256": sha256_hash
-        }
-
-        if product_history_index is None:
-            download_history.append(entry)
-        else:
-            download_history[product_history_index].update(entry)
-        
-        self.utils.create_folder(os.path.dirname(self.download_history_file))
-        self.utils.write_file(self.download_history_file, download_history)
         
     def gather_hardware_sniffer(self):
         if os_name != "Windows":
@@ -339,15 +331,11 @@ class gatheringFiles:
             print("")
             self.utils.request_input()
             raise Exception("Could not find release information for {}.".format(PRODUCT_NAME))
+        local_download_history = self._load_download_history()
 
-        download_history = self.utils.read_file(self.download_history_file)
-        if not isinstance(download_history, list):
-            download_history = []
-
-        product_history_index = self.get_product_index(download_history, PRODUCT_NAME)
+        history_item = local_download_history.get(PRODUCT_NAME)
         
-        if product_history_index is not None:
-            history_item = download_history[product_history_index]
+        if history_item is not None:
             is_latest_id = (product_id == history_item.get("id"))
             
             file_is_valid = False
@@ -361,7 +349,7 @@ class gatheringFiles:
                 return destination_path
 
         print("")
-        print("Updating" if product_history_index is not None else "Please wait for download", end=" ")
+        print("Updating" if history_item is not None else "Please wait for download", end=" ")
         print("{}...".format(PRODUCT_NAME))
         print("")
         print("from {}".format(product_download_url))
@@ -374,6 +362,6 @@ class gatheringFiles:
             self.utils.request_input()
             raise Exception("Failed to download {}.".format(PRODUCT_NAME))
 
-        self._update_download_history(download_history, PRODUCT_NAME, product_id, product_download_url, sha256_hash)
+        self._save_download_history(local_download_history, PRODUCT_NAME, product_id, product_download_url, sha256_hash)
         
         return destination_path

@@ -338,31 +338,30 @@ class OCPE:
         return requirements
 
     def before_using_efi(self, org_hardware_report, hardware_report):
-        while True:
-            self.u.head("Before Using EFI")
-            print("")                 
-            print("\033[93mPlease complete the following steps:\033[0m")
+        self.u.head("Before Using EFI")
+        print("")                 
+        print("\033[93mPlease complete the following steps:\033[0m")
+        print("")
+        
+        bios_requirements = self.check_bios_requirements(org_hardware_report, hardware_report)
+        if bios_requirements:
+            print("* BIOS/UEFI Settings Required:")
+            for requirement in bios_requirements:
+                print("    - {}".format(requirement))
             print("")
-            
-            bios_requirements = self.check_bios_requirements(org_hardware_report, hardware_report)
-            if bios_requirements:
-                print("* BIOS/UEFI Settings Required:")
-                for requirement in bios_requirements:
-                    print("    - {}".format(requirement))
-                print("")
-            
-            print("* USB Mapping:")
-            print("    - Use USBToolBox tool to map USB ports.")
-            print("    - Add created UTBMap.kext into the {} folder.".format("EFI\\OC\\Kexts" if os.name == "nt" else "EFI/OC/Kexts"))
-            print("    - Remove UTBDefault.kext in the {} folder.".format("EFI\\OC\\Kexts" if os.name == "nt" else "EFI/OC/Kexts"))
-            print("    - Edit config.plist:")
-            print("        - Use ProperTree to open your config.plist.")
-            print("        - Run OC Snapshot by pressing Command/Ctrl + R.")
-            print("        - If you have more than 15 ports on a single controller, enable the XhciPortLimit patch.")
-            print("        - Save the file when finished.")
-            print("")
-            self.u.open_folder(self.result_dir)
-            self.u.request_input()
+        
+        print("* USB Mapping:")
+        print("    - Use USBToolBox tool to map USB ports.")
+        print("    - Add created UTBMap.kext into the {} folder.".format("EFI\\OC\\Kexts" if os.name == "nt" else "EFI/OC/Kexts"))
+        print("    - Remove UTBDefault.kext in the {} folder.".format("EFI\\OC\\Kexts" if os.name == "nt" else "EFI/OC/Kexts"))
+        print("    - Edit config.plist:")
+        print("        - Use ProperTree to open your config.plist.")
+        print("        - Run OC Snapshot by pressing Command/Ctrl + R.")
+        print("        - If you have more than 15 ports on a single controller, enable the XhciPortLimit patch.")
+        print("        - Save the file when finished.")
+        print("")
+        self.u.request_input()
+        self.u.open_folder(self.result_dir)
 
     def main(self):
         hardware_report_path = None

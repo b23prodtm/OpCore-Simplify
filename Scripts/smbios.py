@@ -38,14 +38,12 @@ class SMBIOS:
         if retry_count >= max_retries:
             raise Exception("Failed to find macserial after {} attempts".format(max_retries))
         
-        download_history = self.utils.read_file(self.g.download_history_file)
+        current_history = self.utils.read_file(self.g.download_history_file)
 
-        if download_history:
-            product_index = self.g.get_product_index(download_history, "OpenCorePkg")
-            
-            if product_index is not None:
-                download_history.pop(product_index)
-                self.utils.write_file(self.g.download_history_file, download_history)
+        if current_history and isinstance(current_history, list):
+            new_history = [item for item in current_history if item.get("product_name") != "OpenCorePkg"]
+            if len(new_history) != len(current_history):
+                self.utils.write_file(self.g.download_history_file, new_history)
 
         self.g.gather_bootloader_kexts([], "")
         return self.check_macserial(retry_count + 1)

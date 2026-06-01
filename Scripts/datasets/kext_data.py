@@ -128,10 +128,6 @@ kexts = [
         github_repo = {
             "owner": "ChefKissInc",
             "repo": "NootedRed"
-        },
-        download_info = {
-            "id": int("".join(random.choices('0123456789', k=9))), 
-            "url": "https://nightly.link/ChefKissInc/NootedRed/workflows/main/master/Artifacts.zip"
         }
     ),
     KextInfo(
@@ -171,7 +167,7 @@ kexts = [
         category = "Wi-Fi",
         conflict_group_id = "IntelWiFi",
         github_repo = {
-            "owner": "OpenIntelWireless",
+            "owner": "DexterSLamb",
             "repo": "itlwm"
         }
     ),
@@ -227,7 +223,7 @@ kexts = [
         category = "Wi-Fi",
         conflict_group_id = "IntelWiFi",
         github_repo = {
-            "owner": "OpenIntelWireless",
+            "owner": "DexterSLamb",
             "repo": "itlwm"
         }
     ),
@@ -313,7 +309,7 @@ kexts = [
         category = "Bluetooth",
         requires_kexts = ["BlueToolFixup", "IntelBTPatcher", "IntelBluetoothInjector"],
         github_repo = {
-            "owner": "lshbluesky",
+            "owner": "OpenIntelWireless",
             "repo": "IntelBluetoothFirmware"
         }
     ),
@@ -323,7 +319,7 @@ kexts = [
         category = "Bluetooth",
         requires_kexts = ["Lilu", "BlueToolFixup", "IntelBluetoothFirmware", "IntelBluetoothInjector"],
         github_repo = {
-            "owner": "lshbluesky",
+            "owner": "OpenIntelWireless",
             "repo": "IntelBluetoothFirmware"
         }
     ),
@@ -334,7 +330,7 @@ kexts = [
         max_darwin_version = "20.99.99",
         requires_kexts = ["BlueToolFixup", "IntelBluetoothFirmware", "IntelBTPatcher"],
         github_repo = {
-            "owner": "lshbluesky",
+            "owner": "OpenIntelWireless",
             "repo": "IntelBluetoothFirmware"
         }
     ),
@@ -750,10 +746,6 @@ kexts = [
         github_repo = {
             "owner": "ChefKissInc",
             "repo": "ForgedInvariant"
-        },
-        download_info = {
-            "id": int("".join(random.choices('0123456789', k=9))), 
-            "url": "https://nightly.link/ChefKissInc/ForgedInvariant/workflows/main/master/Artifacts.zip"
         }
     ),
     KextInfo(
